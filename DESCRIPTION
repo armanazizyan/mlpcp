@@ -1,0 +1,16 @@
+Package: mlpcp
+Type: Package
+Title: MLP changepoint Detection
+Version: 0.0.1
+Authors@R: c(
+    person(
+      "Arman", "Azizyan",
+      email = "arman.azizyan@gmail.com",
+      role = c("aut", "cre")
+    )
+  )
+Description: -- later
+License: -- later
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.3.3
