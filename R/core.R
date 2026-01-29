@@ -14,9 +14,12 @@ ma <- function(x, n = 5, circular = T){
 }
 
 
-#' Fits MLP with defined structure to rolling window of defined size,
+#' Fitting MLP for CP detection algorithm
+#' @description
+#' Fits MLPs with defined structure to rolling window of defined size,
 #' Then fits another MLP with double the rolling window,
 #' capturing two windows' uncertainty
+#'
 #' @param vec original data
 #' @param act1 activation function of smaller MLP
 #' @param act2 activation function of larger MLP
@@ -39,10 +42,10 @@ fit_mlp <- function(vec, w=100,
 
   num_cores <- parallel::detectCores() - 1
   cl <- parallel::makeCluster(num_cores)
-  registerDoParallel(cl)
+  doParallel::registerDoParallel(cl)
   start_time <- Sys.time()
 
-  res.list <- foreach(idx = seq_along(starts), .packages = "RSNNS") %dopar% {
+  res.list <- foreach(idx = seq_along(starts), .packages = c("RSNNS","mlpcp")) %dopar% {
 
     i <- starts[idx]
 
@@ -75,14 +78,14 @@ fit_mlp <- function(vec, w=100,
   window_step <- 1
   starts <- 1:(n.val-w)
 
-  num_cores <- parallel::detectCores() - 1
+  #num_cores <- parallel::detectCores() - 1
   #cl <- makeCluster(num_cores)
   #registerDoParallel(cl)
 
 
   start_time <- Sys.time()
 
-  res.list.dbl <- foreach(idx = seq_along(starts), .packages = "RSNNS") %dopar% {
+  res.list.dbl <- foreach(idx = seq_along(starts), .packages = c("RSNNS","mlpcp")) %dopar% {
 
     i <- starts[idx]
 

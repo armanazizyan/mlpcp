@@ -14,8 +14,9 @@ plot_mlp_slider_3lines <- function(
 
   n <- length(y)
 
-  res.list1 <- fit_mlp_res[[1]]
-  res.list2 <- fit_mlp_res[[1]][w+1:length(y)]
+  res.list1 <- fit_mlp_res[[2]]
+  res.list2 <- fit_mlp_res[[1]]
+  res.list3 <- fit_mlp_res[[1]][w+1:length(y)]
 
   idx_list <- seq(start, n - 2*w, by = step)
   n_models <- length(idx_list)
