@@ -2,9 +2,7 @@
 % Please edit documentation in R/core.R
 \name{fit_mlp}
 \alias{fit_mlp}
-\title{Fits MLP with defined structure to rolling window of defined size,
-Then fits another MLP with double the rolling window,
-capturing two windows' uncertainty}
+\title{Fitting MLP for CP detection algorithm}
 \usage{
 fit_mlp(
   vec,
@@ -37,7 +35,7 @@ a list of two elements containing the fitted values for the smaller
 and larger MLP models, original input and index.
 }
 \description{
-Fits MLP with defined structure to rolling window of defined size,
+Fits MLPs with defined structure to rolling window of defined size,
 Then fits another MLP with double the rolling window,
 capturing two windows' uncertainty
 }
