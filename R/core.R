@@ -25,7 +25,7 @@ ma <- function(x, n = 5, circular = T){
 #' @param ep1,ep2 number of training epochs for smaller and larger MLP
 #' @return a list of two elements containing the fitted values for the smaller
 #' and larger MLP models, original input and index.
-#' @import RSNNS foreach doParallel parallel
+#' @import RSNNS foreach doParallel
 #' @export
 fit_mlp <- function(vec, w=100,
                  act1="Act_TanH_Xdiv2",
@@ -38,7 +38,7 @@ fit_mlp <- function(vec, w=100,
   y <- vec
 
   num_cores <- parallel::detectCores() - 1
-  cl <- makeCluster(num_cores)
+  cl <- parallel::makeCluster(num_cores)
   registerDoParallel(cl)
   start_time <- Sys.time()
 
