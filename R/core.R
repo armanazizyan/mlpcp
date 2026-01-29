@@ -1,6 +1,6 @@
 # library(RSNNS)
 # library(foreach)
-# library(doParallel)
+# library(doSNOW)
 
 #' Two-sided moving average smoothing
 #' @param x a numeric vector
@@ -28,7 +28,7 @@ ma <- function(x, n = 5, circular = T){
 #' @param ep1,ep2 number of training epochs for smaller and larger MLP
 #' @return a list of two elements containing the fitted values for the smaller
 #' and larger MLP models, original input and index.
-#' @import RSNNS foreach doParallel parallel
+#' @import RSNNS foreach doSNOW parallel txtProgressBar
 #' @export
 fit_mlp <- function(vec, w=100,
                  act1="Act_TanH_Xdiv2",
@@ -40,12 +40,18 @@ fit_mlp <- function(vec, w=100,
   x <- 1:n.val
   y <- vec
 
+  pb <- txtProgressBar(min = 0, max = length(starts), style = 3)
+
+  progress <- function(n) setTxtProgressBar(pb, n)
+  opts <- list(progress = progress)
+
   num_cores <- parallel::detectCores() - 1
   cl <- parallel::makeCluster(num_cores)
-  doParallel::registerDoParallel(cl)
+  doSNOW::registerdoSNOW(cl)
   start_time <- Sys.time()
 
-  res.list <- foreach(idx = seq_along(starts), .packages = c("RSNNS","mlpcp")) %dopar% {
+  res.list <- foreach(idx = seq_along(starts), .packages = c("RSNNS","mlpcp"),
+                      .options.snow = opts) %dopar% {
 
     i <- starts[idx]
 
@@ -76,16 +82,19 @@ fit_mlp <- function(vec, w=100,
 
 
   window_step <- 1
-  starts <- 1:(n.val-w)
+  starts <- 1:(n.val-2*w)
 
   #num_cores <- parallel::detectCores() - 1
   #cl <- makeCluster(num_cores)
-  #registerDoParallel(cl)
+  #registerdoSNOW(cl)
+
+  opts <- list(progress = progress)
 
 
   start_time <- Sys.time()
 
-  res.list.dbl <- foreach(idx = seq_along(starts), .packages = c("RSNNS","mlpcp")) %dopar% {
+  res.list.dbl <- foreach(idx = seq_along(starts), .packages = c("RSNNS","mlpcp"),
+                          .options.snow = opts) %dopar% {
 
     i <- starts[idx]
 
