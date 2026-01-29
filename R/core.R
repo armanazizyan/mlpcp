@@ -172,13 +172,13 @@ calc_detector <- function(y, fit_mlp_res, w=100, a=1, b=0){
     diff2 <- c(diff2,( (rss.tot-rss1-rss2)) )
   }
 
-  diff2 <- (diff2-min(diff2))/(max(diff2)-min(diff2))
-
-  diff1 <- (diff1-min(diff1))/(max(diff1)-min(diff1))
+  diff2 <- (diff2-min(diff2))/(max(diff2-min(diff2)))
+  #
+  diff1 <- (diff1-min(diff1))/(max(diff1-min(diff1)))
 
   diff <- (1-a)*diff1+a*diff2
 
-  diff <- (diff-min(diff))/(max(diff)-min(diff))
+  diff <- (diff-min(diff))/(max(diff-min(diff)))
 
   diff
 }
