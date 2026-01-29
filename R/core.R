@@ -90,8 +90,8 @@ fit_mlp <- function(vec, w=100,
     i <- starts[idx]
 
 
-    sub_x <- as.matrix(as.vector(scale(x[i:(i + w-1)])))
-    sub_y <- as.matrix(y[i:(i + w-1)])
+    sub_x <- as.matrix(as.vector(scale(x[i:(i + 2*w-1)])))
+    sub_y <- as.matrix(y[i:(i + 2*w-1)])
 
 
     net <- mlp(
@@ -105,7 +105,7 @@ fit_mlp <- function(vec, w=100,
 
     y_hat <- net$fitted.values
 
-    cbind(sub_x, y_hat, i:(i + w-1))
+    cbind(sub_x, y_hat, i:(i + 2*w-1))
   }
 
   end_time <- Sys.time()
