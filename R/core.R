@@ -36,7 +36,7 @@ fit_mlp <- function(vec, w=100,
                  lr1=0.01, lr2=0.01, hl1=16,
                  hl2=32, ep1=1000, ep2=2000){
   n.val <- length(vec)
-  starts <- 1:(n.val-w)
+  # starts <- 1:(n.val-w+1)
   x <- 1:n.val
   y <- vec
 
@@ -47,13 +47,13 @@ fit_mlp <- function(vec, w=100,
 
   num_cores <- parallel::detectCores() - 1
   cl <- parallel::makeCluster(num_cores)
-  doSNOW::registerdoSNOW(cl)
+  doSNOW::registerDoSNOW(cl)
   start_time <- Sys.time()
 
-  res.list <- foreach(idx = seq_along(starts), .packages = c("RSNNS","mlpcp"),
+  res.list <- foreach(idx = 1:(n.val-w+1), .packages = c("RSNNS","mlpcp"),
                       .options.snow = opts) %dopar% {
 
-    i <- starts[idx]
+    i <- idx
 
     sub_x <- as.matrix(as.vector(scale(x[i:(i + w-1)])))
     sub_y <- as.matrix(y[i:(i + w-1)])
@@ -79,24 +79,28 @@ fit_mlp <- function(vec, w=100,
 
 
   #stopCluster(cl)
+  close(pb)
 
 
-  window_step <- 1
-  starts <- 1:(n.val-2*w)
+  # window_step <- 1
+  # starts <- 1:(n.val-2*w+1)
 
   #num_cores <- parallel::detectCores() - 1
   #cl <- makeCluster(num_cores)
   #registerdoSNOW(cl)
 
+  pb <- txtProgressBar(min = 0, max = length(starts), style = 3)
+
+  progress <- function(n) setTxtProgressBar(pb, n)
   opts <- list(progress = progress)
 
 
   start_time <- Sys.time()
 
-  res.list.dbl <- foreach(idx = seq_along(starts), .packages = c("RSNNS","mlpcp"),
+  res.list.dbl <- foreach(idx = seq_along(1:(n.val-2*w+1)), .packages = c("RSNNS","mlpcp"),
                           .options.snow = opts) %dopar% {
 
-    i <- starts[idx]
+    i <- idx
 
 
     sub_x <- as.matrix(as.vector(scale(x[i:(i + 2*w-1)])))
@@ -123,6 +127,8 @@ fit_mlp <- function(vec, w=100,
 
 
   stopCluster(cl)
+
+  close(pb)
 
   return(list(res.list, res.list.dbl))
 }
