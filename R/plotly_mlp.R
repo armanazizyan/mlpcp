@@ -1,10 +1,11 @@
-library(plotly)
+#library(plotly)
 
 
 #' Interactive plot of fit_mlp output
 #' @param y the original vector of observations
 #' @param fit_mlp_res the resulting list of fit_mlp function
 #' @return plotly object
+#' @import plotly
 #' @export
 plot_mlp_slider_3lines <- function(
     y, fit_mlp_res,

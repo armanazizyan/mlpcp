@@ -3,3 +3,8 @@
 export(fit_mlp)
 export(ma)
 export(plot_mlp_slider_3lines)
+import(RSNNS)
+import(doParallel)
+import(foreach)
+import(plotly)
+importFrom(stats,filter)

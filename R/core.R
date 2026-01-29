@@ -1,12 +1,13 @@
-library(RSNNS)
-library(foreach)
-library(doParallel)
+# library(RSNNS)
+# library(foreach)
+# library(doParallel)
 
 #' Two-sided moving average smoothing
 #' @param x a numeric vector
 #' @param n number of neighbors to smooth over in total
 #' @param circular if the ends should wrap or remain NA
 #' @return smoothed numeric vector
+#' @importFrom stats filter
 #' @export
 ma <- function(x, n = 5, circular = T){
   stats::filter(x, rep(1 / n, n), sides = 2, circular = circular)
@@ -24,6 +25,7 @@ ma <- function(x, n = 5, circular = T){
 #' @param ep1,ep2 number of training epochs for smaller and larger MLP
 #' @return a list of two elements containing the fitted values for the smaller
 #' and larger MLP models, original input and index.
+#' @import RSNNS foreach doParallel
 #' @export
 fit_mlp <- function(vec, w=100,
                  act1="Act_TanH_Xdiv2",
