@@ -90,7 +90,7 @@ fit_mlp <- function(vec, w=100,
   #cl <- makeCluster(num_cores)
   #registerdoSNOW(cl)
 
-  pb <- txtProgressBar(min = 0, max = length(starts), style = 3)
+  pb <- txtProgressBar(min = 0, max = n.val-2*w, style = 3)
 
   progress <- function(n) setTxtProgressBar(pb, n)
   opts <- list(progress = progress)
