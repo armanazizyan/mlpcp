@@ -118,6 +118,20 @@ fit_mlp <- function(vec, w=100,
   return(list(res.list, res.list.dbl))
 }
 
+
+
+#' Calculate Detector Statistic
+#' @details
+#' Calculates detector statistic using a linear combination of Ratio and DIfference
+#' between RSS of full MLP and half window MLP
+#'
+#' @param y original data
+#' @param fit_mlp_res output of fit_mlp function
+#' @param w window size
+#' @param a a numeric value between 0 and 1, 0 indicating only ratio, 1 indicating only difference
+#' @param b correction to discontinuity for ratio
+#' @returns a vector of detector statistic
+#' @export
 calc_detector <- function(y, fit_mlp_res, w=100, a=1, b=0){
   res.list <- fit_mlp_res[[1]]
   res.list.dbl <- fit_mlp_res[[2]]
