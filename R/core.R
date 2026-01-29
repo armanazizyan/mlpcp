@@ -40,7 +40,7 @@ fit_mlp <- function(vec, w=100,
   x <- 1:n.val
   y <- vec
 
-  pb <- txtProgressBar(min = 0, max = length(starts), style = 3)
+  pb <- txtProgressBar(min = 0, max = n.val-w, style = 3)
 
   progress <- function(n) setTxtProgressBar(pb, n)
   opts <- list(progress = progress)
@@ -75,6 +75,7 @@ fit_mlp <- function(vec, w=100,
 
   end_time <- Sys.time()
   time_taken <- end_time - start_time
+  cat("\n")
   print(time_taken)
 
 
@@ -123,6 +124,7 @@ fit_mlp <- function(vec, w=100,
 
   end_time <- Sys.time()
   time_taken <- end_time - start_time
+  cat("\n")
   print(time_taken)
 
 
