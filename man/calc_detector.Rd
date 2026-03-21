@@ -4,7 +4,7 @@
 \alias{calc_detector}
 \title{Calculate Detector Statistic}
 \usage{
-calc_detector(y, fit_mlp_res, w = 100, a = 1, b = 0)
+calc_detector(y, fit_mlp_res, w = 100, a = 1, b = 0, scale_01 = T)
 }
 \arguments{
 \item{y}{original data}
@@ -16,6 +16,8 @@ calc_detector(y, fit_mlp_res, w = 100, a = 1, b = 0)
 \item{a}{a numeric value between 0 and 1, 0 indicating only ratio, 1 indicating only difference}
 
 \item{b}{correction to discontinuity for ratio}
+
+\item{scale_01}{should the detector be scaled to a 0 to 1 scale.}
 }
 \value{
 a vector of detector statistic

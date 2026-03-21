@@ -147,9 +147,10 @@ fit_mlp <- function(vec, w=100,
 #' @param w window size
 #' @param a a numeric value between 0 and 1, 0 indicating only ratio, 1 indicating only difference
 #' @param b correction to discontinuity for ratio
+#' @param scale_01 should the detector be scaled to a 0 to 1 scale.
 #' @returns a vector of detector statistic
 #' @export
-calc_detector <- function(y, fit_mlp_res, w=100, a=1, b=0){
+calc_detector <- function(y, fit_mlp_res, w=100, a=1, b=0, scale_01=T){
   res.list <- fit_mlp_res[[1]]
   res.list.dbl <- fit_mlp_res[[2]]
   n.val <- length(y)
@@ -172,13 +173,18 @@ calc_detector <- function(y, fit_mlp_res, w=100, a=1, b=0){
     diff2 <- c(diff2,( (rss.tot-rss1-rss2)) )
   }
 
-  diff2 <- (diff2-min(diff2))/(max(diff2-min(diff2)))
-  #
-  diff1 <- (diff1-min(diff1))/(max(diff1-min(diff1)))
+  if(scale_01){
+    diff2 <- (diff2-min(diff2))/(max(diff2-min(diff2)))
+    #
+    diff1 <- (diff1-min(diff1))/(max(diff1-min(diff1)))
 
-  diff <- (1-a)*diff1+a*diff2
+    diff <- (1-a)*diff1+a*diff2
 
-  diff <- (diff-min(diff))/(max(diff-min(diff)))
+    diff <- (diff-min(diff))/(max(diff-min(diff)))
+  }
+  else{
+    diff <- (1-a)*diff1+a*diff2
+  }
 
   diff
 }
