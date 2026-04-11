@@ -233,3 +233,306 @@ best_split_free <- function(labels) {
     accuracy_if_assigning_majorities = total_correct[best_i] / n
   )
 }
+
+#' Best Spike Select
+#' @details
+#' to be added
+#'
+#'
+#' @export
+#'
+select_best_spike <- function(s, right_tail_cutoff = 0.95,
+                              left_tail_cutoff = 0.6) {
+  # s: smoothed spacing vector
+  # p: ECDF probabilities (same length as s)
+  # tail_cutoff: ignore spikes with p > tail_cutoff
+
+  p <- (1:length(s)) / (length(s) + 1)
+
+
+  # Find peaks using pracma::findpeaks
+  peaks <- pracma::findpeaks(s, sortstr = FALSE)
+  if (is.null(peaks)) return(NA)  # no peaks found
+
+  # Extract peak components
+  peak_heights <- peaks[, 1]
+  peak_idx     <- peaks[, 2]
+  left_base    <- peaks[, 3]
+  right_base   <- peaks[, 4]
+
+  # Compute prominence
+  baseline <- pmax(s[left_base], s[right_base])
+  prominence <- peak_heights - baseline
+
+  # Exclude tail region (avoid trivial spike near p=1)
+  valid <- (p[peak_idx] < right_tail_cutoff) & (p[peak_idx] > left_tail_cutoff)
+  if (!any(valid)) return(NA)
+
+  # Select the spike with largest prominence
+  best_idx <- peak_idx[valid][which.max(prominence[valid])]
+  best_p   <- p[best_idx]
+
+  return(best_p)
+}
+
+
+#' Signal Decomposition
+#' @details
+#' to be added
+#'
+#'
+#' @export
+#'
+decompose_signal <- function(
+    y,
+    diff,
+    w = 200,
+    ma_window = 100,
+    right_tail_cutoff = 0.95,
+    left_tail_cutoff = 0.6,
+    threshold = "auto"
+) {
+
+  n <- length(y)
+
+  ## 1. Local maxima of raw detector
+  pre.sm.local <- pracma::findpeaks(diff, minpeakdistance = w)
+
+  ## 2. Smooth detector
+  ma.diff <- as.numeric(ma(diff, ma_window))
+
+  ## 3. Local maxima of smoothed detector
+  l.max <- pracma::findpeaks(ma.diff, minpeakdistance = w)
+
+  ## 4. ECDF significance
+  f_diff <- ecdf(ma.diff)
+  ecdf_vals <- f_diff(l.max[,1])
+  l.max <- cbind(l.max, ecdf_vals)  # col 5 = ECDF
+
+  ## 5. ECDF spacing curve
+  x.diff <- sort(ma.diff)
+  dx <- diff(x.diff)
+  s <- as.numeric(ma(dx, w, circular = FALSE))
+  s[is.na(s)] <- 0
+
+  ## 6. Threshold selection
+  if (is.character(threshold) && threshold == "auto") {
+    thr <- select_best_spike(
+      s,
+      right_tail_cutoff = right_tail_cutoff,
+      left_tail_cutoff  = left_tail_cutoff
+    )
+  } else if (is.numeric(threshold)) {
+    thr <- threshold
+  } else {
+    stop("threshold must be 'auto' or numeric.")
+  }
+
+  ## 7. Changepoints
+  cps_raw <- l.max[l.max[,5] >= thr, , drop = FALSE]
+  cps <- cps_raw[,2] + w
+
+  ## 8. Local correction around each changepoint
+  marg <- w
+  cor.cps <- c()
+  shift.vals <- c()
+  wc.p <- c()
+
+  for (cp in sort(cps)) {
+
+    segment <- y[cp - ((-marg):marg)]
+    b <- kmeans(segment, centers = 2)
+    bsf <- best_split_free(b$cluster)
+
+    corr.ind <- marg - bsf$index
+    corrected_cp <- cp + corr.ind
+    cor.cps <- c(cor.cps, corrected_cp)
+
+    shift.vals <- c(
+      shift.vals,
+      median(y[cp:(cp+marg) - bsf$index]) -
+        median(y[((cp+marg) - bsf$index) + (0:marg)])
+    )
+
+    wc.p <- c(
+      wc.p,
+      wilcox.test(
+        y[cp:(cp+marg) - bsf$index],
+        y[((cp+marg) - bsf$index) + (0:marg)],
+        exact = FALSE
+      )$p.value
+    )
+  }
+
+  ## 9. Raw piecewise correction vector (cor.vec)
+  cps <- cor.cps
+  starts <- cps + 1
+  ends <- c(cps[-1], n)
+
+  cor.vec <- numeric(n)
+  cumulative.shift.vals <- cumsum(shift.vals)
+
+  for (i in seq_along(starts)) {
+    cor.vec[starts[i]:ends[i]] <- cumulative.shift.vals[i]
+  }
+
+  ## 10. Apply correction
+  new.y <- y + cor.vec
+
+  ## 11. MLP fit on corrected signal
+  x <- 1:n
+  sub_x <- as.matrix(as.vector(scale(x)))
+  sub_y <- as.matrix(new.y)
+
+  net <- RSNNS::mlp(
+    sub_x, sub_y,
+    size = 64,
+    learnFuncParams = c(0.01, 0.001),
+    maxit = 2000,
+    linOut = TRUE,
+    hiddenActFunc = "Act_Logistic"
+  )
+
+  new.y_hat <- net$fitted.values
+  new.resid <- new.y - new.y_hat
+
+  ## 12. Step means of residuals (corrected piecewise constant)
+  idx_start <- c(1, cps + 1)
+  idx_end <- c(cps, length(y))
+
+  step_mean <- numeric(length(y))
+  for (i in seq_along(idx_start)) {
+    step_mean[idx_start[i]:idx_end[i]] <-
+      mean((y - new.y_hat)[idx_start[i]:idx_end[i]])
+  }
+
+  min.step <- step_mean[1]
+  step_mean <- step_mean - min.step
+  new.y_hat <- new.y_hat + min.step
+
+  ## 13. Return
+  list(
+    corrected_signal   = new.y,
+    smooth_curve       = new.y_hat,
+    piecewise_constant = step_mean,   # <- corrected piecewise constant
+    raw_correction     = cor.vec,     # original cor.vec kept for reference
+    residual           = new.resid,
+    changepoints       = cps,
+    changepoint_ecdf   = cps_raw[,5],
+    shift_values       = shift.vals,
+    p_values           = wc.p,
+    smoothed_detector  = ma.diff,
+    ecdf_spacing       = s,
+    threshold_used     = thr,
+    local_maxima       = l.max,
+    mlp_model          = net
+  )
+}
+
+
+#' Confidence Interval
+#' @details
+#' to be added
+#'
+#'
+#' @export
+#'
+changepoint_CI <- function(
+    decomp,
+    alpha  = 0.05,
+    B      = 5000,
+    K      = 500,
+    regime = c("auto", "vanishing", "nonvanishing")
+) {
+  regime <- match.arg(regime)
+
+  cps        <- sort(decomp$changepoints)
+  xi.hat.vec <- decomp$shift_values
+  resid      <- decomp$residual
+  n          <- length(resid)
+
+  if (length(cps) == 0L) stop("No changepoints found in 'decomp'.")
+
+  sigma.hat <- sd(resid)
+
+  ## ------------------------------------------------------------
+  ## NON-VANISHING CASE (unchanged)
+  ## ------------------------------------------------------------
+  simulate_nonvanishing <- function(B, K, xi, sigma) {
+    zeta <- -K:K
+    Zmax <- numeric(B)
+
+    for (b in seq_len(B)) {
+      zpos <- rnorm(K, mean = -xi^2, sd = sqrt(4 * xi^2 * sigma^2))
+      zneg <- rnorm(K, mean = -xi^2, sd = sqrt(4 * xi^2 * sigma^2))
+
+      Cpos <- cumsum(zpos)
+      Cneg <- cumsum(zneg)
+
+      C <- c(rev(Cneg), 0, Cpos)
+      Zmax[b] <- zeta[which.max(C)]
+    }
+
+    Zmax
+  }
+
+  ## ------------------------------------------------------------
+  ## VANISHING CASE — Chernoff quantiles (stable)
+  ## ------------------------------------------------------------
+  chernoff_tab <- data.frame(
+    p = c(0.50, 0.75, 0.90, 0.95, 0.975, 0.99),
+    c = c(1.60, 3.00, 4.60, 6.00, 7.20, 8.60)
+  )
+
+  q_vanishing <- function(p) {
+    approx(chernoff_tab$p, chernoff_tab$c, xout = p, rule = 2)$y
+  }
+
+  # Bai (1997) eq. (14): L = xi^2 / sigma^2
+  L_hat_scalar <- function(xi_hat, sigma_hat) {
+    (xi_hat^2) / (sigma_hat^2)
+  }
+
+  ## ------------------------------------------------------------
+  ## CI assembly
+  ## ------------------------------------------------------------
+  CI_mat <- matrix(NA_real_, nrow = length(cps), ncol = 2)
+  colnames(CI_mat) <- c("lower", "upper")
+
+  for (j in seq_along(cps)) {
+    tau.hat <- cps[j]
+    xi.hat  <- xi.hat.vec[j]
+
+    seg_start <- if (j == 1L) 1L else cps[j - 1L] + 1L
+    seg_end   <- if (j == length(cps)) n else cps[j + 1L]
+
+    reg_j <- regime
+    if (regime == "auto") {
+      reg_j <- if (xi.hat < sigma.hat) "vanishing" else "nonvanishing"
+    }
+
+    if (reg_j == "vanishing") {
+      L_hat <- L_hat_scalar(xi.hat, sigma.hat)
+
+      c_pos <- q_vanishing(1 - alpha/2)
+      q_vec <- c(-c_pos, c_pos)
+
+      CI <- tau.hat + q_vec / L_hat
+
+    } else {
+      Z_rw <- simulate_nonvanishing(B, K, xi.hat, sigma.hat)
+      q_rw <- quantile(Z_rw, c(alpha/2, 1 - alpha/2))
+      CI   <- tau.hat + as.numeric(q_rw)
+    }
+
+    CI <- round(pmax(seg_start, pmin(seg_end, CI)))
+    CI_mat[j, ] <- CI
+  }
+
+  data.frame(
+    changepoint = cps,
+    shift_value = xi.hat.vec,
+    CI_lower    = CI_mat[, 1],
+    CI_upper    = CI_mat[, 2]
+  )
+}
