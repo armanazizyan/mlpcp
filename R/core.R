@@ -455,30 +455,28 @@ changepoint_CI <- function(
 
   sigma.hat <- sd(resid)
 
-  ## ------------------------------------------------------------
-  ## NON-VANISHING CASE (unchanged)
-  ## ------------------------------------------------------------
+  ## -----------------------------
+  ## Non‑vanishing: BM + drift
+  ## -----------------------------
   simulate_nonvanishing <- function(B, K, xi, sigma) {
     zeta <- -K:K
+    m    <- length(zeta)
     Zmax <- numeric(B)
 
+    drift <- abs(zeta) * (xi^2 / (2 * sigma^2))
+
     for (b in seq_len(B)) {
-      zpos <- rnorm(K, mean = -xi^2, sd = sqrt(4 * xi^2 * sigma^2))
-      zneg <- rnorm(K, mean = -xi^2, sd = sqrt(4 * xi^2 * sigma^2))
-
-      Cpos <- cumsum(zpos)
-      Cneg <- cumsum(zneg)
-
-      C <- c(rev(Cneg), 0, Cpos)
-      Zmax[b] <- zeta[which.max(C)]
+      W  <- cumsum(rnorm(m, mean = 0, sd = 1))
+      Z  <- W - drift
+      Zmax[b] <- zeta[which.max(Z)]
     }
 
     Zmax
   }
 
-  ## ------------------------------------------------------------
-  ## VANISHING CASE — Chernoff quantiles (stable)
-  ## ------------------------------------------------------------
+  ## -----------------------------
+  ## Vanishing: Chernoff‑type
+  ## -----------------------------
   chernoff_tab <- data.frame(
     p = c(0.50, 0.75, 0.90, 0.95, 0.975, 0.99),
     c = c(1.60, 3.00, 4.60, 6.00, 7.20, 8.60)
@@ -488,14 +486,9 @@ changepoint_CI <- function(
     approx(chernoff_tab$p, chernoff_tab$c, xout = p, rule = 2)$y
   }
 
-  # Bai (1997) eq. (14): L = xi^2 / sigma^2
-  L_hat_scalar <- function(xi_hat, sigma_hat) {
-    (xi_hat^2) / (sigma_hat^2)
-  }
-
-  ## ------------------------------------------------------------
+  ## -----------------------------
   ## CI assembly
-  ## ------------------------------------------------------------
+  ## -----------------------------
   CI_mat <- matrix(NA_real_, nrow = length(cps), ncol = 2)
   colnames(CI_mat) <- c("lower", "upper")
 
@@ -503,21 +496,16 @@ changepoint_CI <- function(
     tau.hat <- cps[j]
     xi.hat  <- xi.hat.vec[j]
 
-    seg_start <- if (j == 1L) 1L else cps[j - 1L] + 1L
-    seg_end   <- if (j == length(cps)) n else cps[j + 1L]
-
     reg_j <- regime
     if (regime == "auto") {
-      reg_j <- if (xi.hat < sigma.hat) "vanishing" else "nonvanishing"
+      reg_j <- if (abs(xi.hat) < sigma.hat) "vanishing" else "nonvanishing"
     }
 
     if (reg_j == "vanishing") {
-      L_hat <- L_hat_scalar(xi.hat, sigma.hat)
-
+      ## n^{1/3} scaling, Chernoff quantile
       c_pos <- q_vanishing(1 - alpha/2)
       q_vec <- c(-c_pos, c_pos)
-
-      CI <- tau.hat + q_vec / L_hat
+      CI    <- tau.hat + q_vec * n^(-1/3)
 
     } else {
       Z_rw <- simulate_nonvanishing(B, K, xi.hat, sigma.hat)
@@ -525,7 +513,8 @@ changepoint_CI <- function(
       CI   <- tau.hat + as.numeric(q_rw)
     }
 
-    CI <- round(pmax(seg_start, pmin(seg_end, CI)))
+    ## only clip to [1, n], not to segment
+    CI <- round(pmax(1, pmin(n, CI)))
     CI_mat[j, ] <- CI
   }
 
