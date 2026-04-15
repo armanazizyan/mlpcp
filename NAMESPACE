@@ -2,9 +2,12 @@
 
 export(best_split_free)
 export(calc_detector)
+export(changepoint_CI)
+export(decompose_signal)
 export(fit_mlp)
 export(ma)
 export(plot_mlp_slider_3lines)
+export(select_best_spike)
 import(RSNNS)
 import(doSNOW)
 import(foreach)
