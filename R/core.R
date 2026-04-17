@@ -340,25 +340,35 @@ decompose_signal <- function(
 
   for (cp in sort(cps)) {
 
-    segment <- y[cp - ((-marg):marg)]
+    lo <- max(1, cp - marg)
+    hi <- min(n, cp + marg)
+
+    segment <- y[lo:hi]
+
     b <- kmeans(segment, centers = 2)
     bsf <- best_split_free(b$cluster)
 
-    corr.ind <- marg - bsf$index
-    corrected_cp <- cp + corr.ind
+    corrected_cp <- cp + (marg - bsf$index)
+    corrected_cp <- min(max(corrected_cp, 1), n)
     cor.cps <- c(cor.cps, corrected_cp)
+
+    # safe windows
+    w1_start <- max(1, cp - bsf$index)
+    w1_end   <- min(n, cp + marg - bsf$index)
+
+    w2_start <- max(1, (cp + marg - bsf$index))
+    w2_end   <- min(n, (cp + 2*marg - bsf$index))
 
     shift.vals <- c(
       shift.vals,
-      median(y[cp:(cp+marg) - bsf$index]) -
-        median(y[((cp+marg) - bsf$index) + (0:marg)])
+      median(y[w1_start:w1_end]) - median(y[w2_start:w2_end])
     )
 
     wc.p <- c(
       wc.p,
       wilcox.test(
-        y[cp:(cp+marg) - bsf$index],
-        y[((cp+marg) - bsf$index) + (0:marg)],
+        y[w1_start:w1_end],
+        y[w2_start:w2_end],
         exact = FALSE
       )$p.value
     )
