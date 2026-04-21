@@ -449,56 +449,60 @@ decompose_signal <- function(
 #'
 changepoint_CI <- function(
     decomp,
-    alpha  = 0.05,
-    B      = 5000,
-    K      = 500,
+    alpha = 0.05,
+    B = 5000,
+    K = 500,
     regime = c("auto", "vanishing", "nonvanishing")
 ) {
   regime <- match.arg(regime)
 
-  cps        <- sort(decomp$changepoints)
+  cps        <- decomp$changepoints
   xi.hat.vec <- decomp$shift_values
   resid      <- decomp$residual
   n          <- length(resid)
 
-  if (length(cps) == 0L) stop("No changepoints found in 'decomp'.")
+  if (length(cps) == 0L) {
+    stop("No changepoints found in 'decomp'.")
+  }
 
+  # noise estimate
   sigma.hat <- sd(resid)
 
-  ## -----------------------------
-  ## Non‑vanishing: BM + drift
-  ## -----------------------------
-  simulate_nonvanishing <- function(B, K, xi, sigma) {
+  # helper: simulate vanishing-jump limit (Brownian with drift)
+  simulate_vanishing <- function(B, K, sigma) {
+    Zmax <- numeric(B)
     zeta <- -K:K
     m    <- length(zeta)
-    Zmax <- numeric(B)
-
-    drift <- abs(zeta) * (xi^2 / (2 * sigma^2))
-
     for (b in seq_len(B)) {
-      W  <- cumsum(rnorm(m, mean = 0, sd = 1))
-      Z  <- W - drift
+      W <- cumsum(rnorm(m, 0, 1))
+      Z <- 2 * sigma * W - abs(zeta)
       Zmax[b] <- zeta[which.max(Z)]
     }
-
     Zmax
   }
 
-  ## -----------------------------
-  ## Vanishing: Chernoff‑type
-  ## -----------------------------
-  chernoff_tab <- data.frame(
-    p = c(0.50, 0.75, 0.90, 0.95, 0.975, 0.99),
-    c = c(1.60, 3.00, 4.60, 6.00, 7.20, 8.60)
-  )
+  # helper: simulate non-vanishing-jump limit (random walk with drift)
+  simulate_nonvanishing <- function(B, K, xi, sigma) {
+    Zmax <- numeric(B)
+    zeta <- -K:K
+    for (b in seq_len(B)) {
+      zpos <- rnorm(K, mean = -xi^2, sd = sqrt(4 * xi^2 * sigma^2))
+      zneg <- rnorm(K, mean = -xi^2, sd = sqrt(4 * xi^2 * sigma^2))
 
-  q_vanishing <- function(p) {
-    approx(chernoff_tab$p, chernoff_tab$c, xout = p, rule = 2)$y
+      Cpos <- cumsum(zpos)
+      Cneg <- cumsum(zneg)
+
+      C <- c(rev(-Cneg), 0, Cpos)
+      Zmax[b] <- zeta[which.max(C)]
+    }
+    Zmax
   }
 
-  ## -----------------------------
-  ## CI assembly
-  ## -----------------------------
+  # precompute Brownian limit once (parameter-free after scaling by xi^2)
+  Z_brown <- simulate_vanishing(B = B, K = K, sigma = sigma.hat)
+  q_brown <- quantile(Z_brown, c(alpha / 2, 1 - alpha / 2))
+
+  # container
   CI_mat <- matrix(NA_real_, nrow = length(cps), ncol = 2)
   colnames(CI_mat) <- c("lower", "upper")
 
@@ -506,24 +510,23 @@ changepoint_CI <- function(
     tau.hat <- cps[j]
     xi.hat  <- xi.hat.vec[j]
 
+    # decide regime
     reg_j <- regime
     if (regime == "auto") {
-      reg_j <- if (abs(xi.hat) < sigma.hat) "vanishing" else "nonvanishing"
+      reg_j <- if (xi.hat < sigma.hat) "vanishing" else "nonvanishing"
     }
 
     if (reg_j == "vanishing") {
-      ## n^{1/3} scaling, Chernoff quantile
-      c_pos <- q_vanishing(1 - alpha/2)
-      q_vec <- c(-c_pos, c_pos)
-      CI    <- tau.hat + q_vec * n^(-1/3)
-
+      # xi^2 (tau_hat - tau_0) -> Z
+      CI <- tau.hat + as.numeric(q_brown) / (xi.hat^2)
     } else {
-      Z_rw <- simulate_nonvanishing(B, K, xi.hat, sigma.hat)
-      q_rw <- quantile(Z_rw, c(alpha/2, 1 - alpha/2))
+      # simulate random-walk limit for this xi
+      Z_rw <- simulate_nonvanishing(B = B, K = K, xi = xi.hat, sigma = sigma.hat)
+      q_rw <- quantile(Z_rw, c(alpha / 2, 1 - alpha / 2))
       CI   <- tau.hat + as.numeric(q_rw)
     }
 
-    ## only clip to [1, n], not to segment
+    # clip and round
     CI <- round(pmax(1, pmin(n, CI)))
     CI_mat[j, ] <- CI
   }
@@ -535,3 +538,4 @@ changepoint_CI <- function(
     CI_upper    = CI_mat[, 2]
   )
 }
+
